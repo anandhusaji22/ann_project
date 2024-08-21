@@ -1,59 +1,78 @@
-from keras.datasets import mnist
-from keras.utils import to_categorical
-from keras import optimizers
-from keras import metrics
+#%%
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
 
-import pandas as pd
+def showimg(img, cmap='gray'):
+    plt.imshow(img, cmap=cmap)
+    plt.axis("off")
+    plt.show()
 
-def photo_add(photo):
-    """Add a photo to the database."""
-    
+# Load and convert the image to grayscale
+image = cv2.imread(r'C:\Mathlab\my code\ANN\annpro\ann_project\img.jpg')
+image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+# showimg(image)
 
+def resize(img):
+    target_size = (28, 28)
 
+    # Get the original dimensions
+    original_height, original_width = img.shape[:2]
 
+    # Calculate the aspect ratio
+    aspect_ratio = original_width / original_height
 
-def training_data():
-    
+    # Determine the new size while maintaining the aspect ratio
+    if aspect_ratio > 1:  # Wider than tall
+        new_width = target_size[0]
+        new_height = int(new_width / aspect_ratio)
+    else:  # Taller than wide or square
+        new_height = target_size[1]
+        new_width = int(new_height * aspect_ratio)
 
-    (x_train, y_train), (x_test, y_test) = mnist.load_data()
-    x_train = x_train.reshape((60000, 784))
-    x_train = x_train.astype('float32') / 255
+    # Resize the image while maintaining the aspect ratio
+    resized_image = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
 
-    x_test = x_test.reshape((10000, 784))
-    x_test = x_test.astype('float32') / 255
+    # Calculate padding to be added
+    pad_top = (target_size[1] - new_height) // 2
+    pad_bottom = target_size[1] - new_height - pad_top
+    pad_left = (target_size[0] - new_width) // 2
+    pad_right = target_size[0] - new_width - pad_left
 
+    # Add padding to the resized image to make it 28x28
+    padded_image = cv2.copyMakeBorder(resized_image, pad_top, pad_bottom, pad_left, pad_right,
+                                    borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+    return padded_image
 
-    y_train = to_categorical(y_train)
-    y_test = to_categorical(y_test)
-    #Create Neural Network Model
+#%%
+# Apply thresholding to create a binary image
+_, binary = cv2.threshold(image, 128, 255, cv2.THRESH_BINARY_INV)
+showimg(binary)
 
-    from keras import models        #To define type of model - Sequential/Functional
-    from keras import layers         #To define type of layers
+# Find contours
+contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    model = models.Sequential()
+# Minimum area threshold (adjust this value based on your needs)
+min_area = 150
 
-    model.add(layers.Dense(100 , activation='relu' , input_dim=x_train.shape[1]))    #To add hidden layer 1
-    model.add(layers.Dense(50 , activation='relu'))
-    model.add(layers.Dense(10 , activation='sigmoid'))                                #To add layer 2
+# Filter contours by area
+filtered_contours = [contour for contour in contours if cv2.contourArea(contour) > min_area]
+symbols=[]
+# Draw bounding boxes around filtered contours
+for contour in filtered_contours:
+    x, y, w, h = cv2.boundingRect(contour)
+    # cv2.rectangle(image,  (x+w, y+h),(x, y), (0, 255, 0), 2)
+    # symbols.append(binary[y:(y+h), x:(x+w)])
+    symbols.append([x,y,w,h])
+symbols.sort(key= lambda x : x[0] )
 
-    model.summary()
+for s in symbols:
+    x, y, w, h=s
+    showimg(resize(binary[y:(y+h), x:(x+w)]))
 
+# Display the image with bounding boxes using OpenCV window
 
-    xtrainC = x_train/x_train.max()
-    xtestC = x_test/x_test.max()
+#%%
 
-
-    #import tensorflow as tf
-
-
-
-#sgd = tf.keras.optimizers.SGD(0.01)
-
-    model.compile(optimizer = 'sgd',loss = 'categorical_crossentropy',metrics=['accuracy'])
-    
-
-    model.fit(xtrainC,y_train,
-          epochs = 40 , validation_data=(xtestC,y_test))
-    
-    c=model.evaluate(xtestC,y_test)
-    print(c)
+# Alternatively, display the result with bounding boxes using Matplotlib
+showimg(image)
