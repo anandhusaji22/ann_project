@@ -95,8 +95,9 @@ if __name__ == "__main__":
         model, class_names = train_model()
 
     # Step 2: Predict using the saved model
-    print('Your code is predicting. Please be cool...!')
-    label, confidence = predict_image("symbol2.png", model, class_names)
+        print('Your code is predicting. Please be cool...!')
+    
+    label, confidence = predict_image("symbol7.png", model, class_names)
     if (confidence*100)<=30:
             print("Prediction failed. Confidence is too low.")
     elif label:
@@ -104,3 +105,8 @@ if __name__ == "__main__":
         #     print("Prediction failed. Confidence is too low.")
         print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
     print('Prediction completed!')
+    # print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
+    # print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
+
+# print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
+print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
