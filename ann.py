@@ -1,59 +1,227 @@
-from keras.datasets import mnist
+#%%
+import cv2
+import matplotlib.pyplot as plt
+import os
+import numpy as np
+from keras.models import Sequential, load_model
+from keras import layers
 from keras.utils import to_categorical
-from keras import optimizers
-from keras import metrics
+from sklearn.model_selection import train_test_split
+from PIL import Image
+from sklearn.preprocessing import LabelEncoder
 
-import pandas as pd
+cap = cv2.VideoCapture(0) 
+model = None
+class_names = None
 
-def photo_add(photo):
-    """Add a photo to the database."""
+
+def showimg(img, cmap='gray'):
+    plt.imshow(img, cmap=cmap)
+    plt.axis("off")
+    plt.show()
+
+
+def resize(img):
+    target_size = (28, 28)
+
+    # Get the original dimensions
+    original_height, original_width = img.shape[:2]
+
+    # Calculate the aspect ratio
+    aspect_ratio = original_width / original_height
+
+    # Determine the new size while maintaining the aspect ratio
+    if aspect_ratio > 1:  # Wider than tall
+        new_width = target_size[0]
+        new_height = int(new_width / aspect_ratio)
+    else:  # Taller than wide or square
+        new_height = target_size[1]
+        new_width = int(new_height * aspect_ratio)
+
+    # Resize the image while maintaining the aspect ratio
+    resized_image = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
+
+    # Calculate padding to be added
+    pad_top = (target_size[1] - new_height) // 2
+    pad_bottom = target_size[1] - new_height - pad_top
+    pad_left = (target_size[0] - new_width) // 2
+    pad_right = target_size[0] - new_width - pad_left
+
+    # Add padding to the resized image to make it 28x28
+    padded_image = cv2.copyMakeBorder(resized_image, pad_top, pad_bottom, pad_left, pad_right,
+                                    borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+    return padded_image
+
+def symbol_position(image):
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # Apply thresholding to create a binary image
+    _, binary = cv2.threshold(image, 153, 255, cv2.THRESH_BINARY_INV)
+    cv2.imshow('blacky', binary)
+
+    # Find contours
+    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Minimum area threshold (adjust this value based on your needs)
+    min_area = 5
+
+    filtered_contours = [contour for contour in contours if cv2.contourArea(contour) > min_area]
+    symbols_loc = [cv2.boundingRect(contour) for contour in filtered_contours]
+    symbols_loc.sort(key= lambda x : x[0] )
+    return symbols_loc,binary
+
+
+
+#%%
+def vedioTracking():
+    while True:
+        _, frame = cap.read() 
+
+        # Flip image 
+        # frame = cv2.flip(frame, 1) 
+        # Draw a rectangle on the frame
+        x, y, w, h = 200, 200, 200, 100  # Example values (x, y) is top-left and (w, h) is width and height
+        cropped_frame = frame[y:y+h, x:x+w].copy()
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 225), 2)
+        # Process the image to get the position and binary mask
+        pos, binary = symbol_position(cropped_frame)
+
+        # Display text at the specified position
+        text = "=3"
+        if pos:
+            x_pos, y_pos,w_pos,h_pos = pos[-1]  # Assuming `pos` contains the (x, y) position
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 1
+            color = (0, 0, 0)  # White color
+            thickness = 2
+            # Draw the text on the image
+            cv2.putText(frame, text, (x_pos+x+w_pos+20, y_pos+y+h_pos), font, font_scale, color, thickness)
+            for p in pos:
+                conx,cony,conW,conH = p
+                cv2.rectangle(frame,(conx+x,cony+y),(conx+x+conW,cony+y+conH),(255, 0, 0),1)
+
+
+
+        
+        # Optionally, display the frame with the text (e.g., in a window)
+        cv2.imshow('Frame with Text', frame)
+        if cv2.waitKey(1) & 0xff == ord('q'): 
+            break
+    cap.release()
+    cv2.destroyAllWindows()
+
+#%%
+
+
+# Load the model and class names once globally
+
+def load_images_from_folder(folder_path):
+    images = []
+    labels = []
+
+    for image_file in os.listdir(folder_path):
+        try:
+            label, _ = image_file.split('-')
+            labels.append(label)
+
+            img_path = os.path.join(folder_path, image_file)
+            img = Image.open(img_path).convert('L')  # Convert to grayscale
+
+            img_array = np.array(img)
+            _, binary_image = cv2.threshold(img_array, 10, 255, cv2.THRESH_BINARY_INV)
+
+            images.append(binary_image)
+        except Exception as e:
+            print(f"Failed to load image {img_path}: {e}")
+
+    label_encoder = LabelEncoder()
+    numeric_labels = label_encoder.fit_transform(labels)
+
+    return np.array(images), numeric_labels, label_encoder.classes_
+
+def train_model(dataset_path='symbols'):
+    print('Please wait, the network is training...!')
+    images, labels, class_names = load_images_from_folder(dataset_path)
+    images = images.reshape((images.shape[0], 784)).astype('float32') / 255  # Flatten and normalize
+    labels = to_categorical(labels)
+
+    x_train, x_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
+
+    model = Sequential([
+        layers.Dense(80, activation='relu', input_shape=(784,)),  # Input layer with hidden layer 1
+        layers.Dense(len(class_names), activation='softmax')  # Output layer
+    ])
+
+    model.compile(optimizer='sgd', loss='categorical_crossentropy', metrics=['accuracy'])
+    model.fit(x_train, y_train, epochs=8, validation_data=(x_test, y_test))
+
+    model.save('symbol_model.h5')  # Save the trained model
+
+    print("Model trained and saved as 'symbol_model.h5'")
+    print(f"Class names: {class_names}")  # Save this for later use in prediction
+    return model, class_names
+
+def predict_image(image_path, model, class_names):
+    img = Image.open(image_path).convert('L')  # Convert to grayscale
+    img = img.resize((28, 28))  # Resize to 28x28 pixels
+
+    img_array = np.array(img).reshape(1, 784).astype('float32') / 255
+    predictions = model.predict(img_array)
+    prediction = np.argmax(predictions)
+    confidence = predictions[0][prediction]  # Confidence score
+
+    plt.imshow(img, cmap='gray')
+    plt.title(f"Predicted Label: {class_names[prediction]} (Confidence: {confidence:.2f})")
+    plt.show()
+
+    return class_names[prediction], confidence
+def load_trained_model():
+    try:
+        model = load_model('symbol_model.h5')
+        _, _, class_names = load_images_from_folder('symbols')  # Ensure you load class names
+        print("Loaded saved model.")
+        return model, class_names
+    except Exception as e:
+        print(f"Failed to load model: {e}")
+        return None, None
+
+
+# Main Execution Flow
+if __name__ == "__main__":
+
+#=======================my code start ====================================
+    vedioTracking()
+    # image = cv2.imread(r'C:\Mathlab\my code\ANN\annpro\ann_project\img.jpg')
+    # pos,binary=symbol_position(image)
+    # symbols = [resize(binary[y:y+h, x:x+w]) for x, y, w, h in pos]
+
+    # count=1
+    # f = "C:\\Mathlab\\my code\\ANN\\annpro\\ann_project\\images\\"
+    # for sym in symbols:
+    #     showimg(sym)
+    #     cv2.imwrite(f'{f}\symbol{count}.png', sym)
+    #     count+=1
+#================== my code end =============================================
+    # Step 1: Train the model (only once)
+    # Check if the model is already trained and saved
+    if os.path.exists('symbol_model.h5'):
+        model, class_names = load_trained_model()
+    else:
+        # Step 1: Train the model (only if not already trained)
+        model, class_names = train_model()
+
+    # Step 2: Predict using the saved model
+        print('Your code is predicting. Please be cool...!')
     
+    label, confidence = predict_image("symbol7.png", model, class_names)
+    if (confidence*100)<=30:
+            print("Prediction failed. Confidence is too low.")
+    elif label:
+        # if (confidence*100)<=30:
+        #     print("Prediction failed. Confidence is too low.")
+        print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
+    print('Prediction completed!')
+    # print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
+    # print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
 
-
-
-
-def training_data():
-    
-
-    (x_train, y_train), (x_test, y_test) = mnist.load_data()
-    x_train = x_train.reshape((60000, 784))
-    x_train = x_train.astype('float32') / 255
-
-    x_test = x_test.reshape((10000, 784))
-    x_test = x_test.astype('float32') / 255
-
-
-    y_train = to_categorical(y_train)
-    y_test = to_categorical(y_test)
-    #Create Neural Network Model
-
-    from keras import models        #To define type of model - Sequential/Functional
-    from keras import layers         #To define type of layers
-
-    model = models.Sequential()
-
-    model.add(layers.Dense(100 , activation='relu' , input_dim=x_train.shape[1]))    #To add hidden layer 1
-    model.add(layers.Dense(50 , activation='relu'))
-    model.add(layers.Dense(10 , activation='sigmoid'))                                #To add layer 2
-
-    model.summary()
-
-
-    xtrainC = x_train/x_train.max()
-    xtestC = x_test/x_test.max()
-
-
-    #import tensorflow as tf
-
-
-
-#sgd = tf.keras.optimizers.SGD(0.01)
-
-    model.compile(optimizer = 'sgd',loss = 'categorical_crossentropy',metrics=['accuracy'])
-    
-
-    model.fit(xtrainC,y_train,
-          epochs = 40 , validation_data=(xtestC,y_test))
-    
-    c=model.evaluate(xtestC,y_test)
-    print(c)
+# print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
+print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
