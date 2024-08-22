@@ -1,8 +1,8 @@
 #%%
 import cv2
-import numpy as np
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
 cap = cv2.VideoCapture(0) 
+
 
 def showimg(img, cmap='gray'):
     plt.imshow(img, cmap=cmap)
@@ -44,14 +44,14 @@ def resize(img):
 def symbol_position(image):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # Apply thresholding to create a binary image
-    _, binary = cv2.threshold(image, 100, 255, cv2.THRESH_BINARY_INV)
+    _, binary = cv2.threshold(image, 153, 255, cv2.THRESH_BINARY_INV)
     cv2.imshow('blacky', binary)
 
     # Find contours
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     # Minimum area threshold (adjust this value based on your needs)
-    min_area = 50
+    min_area = 5
 
     filtered_contours = [contour for contour in contours if cv2.contourArea(contour) > min_area]
     symbols_loc = [cv2.boundingRect(contour) for contour in filtered_contours]
@@ -68,9 +68,9 @@ def vedioTracking():
         # Flip image 
         # frame = cv2.flip(frame, 1) 
         # Draw a rectangle on the frame
-        x, y, w, h = 100, 100, 200, 100  # Example values (x, y) is top-left and (w, h) is width and height
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        cropped_frame = frame[y:y+h, x:x+w]
+        x, y, w, h = 200, 200, 200, 100  # Example values (x, y) is top-left and (w, h) is width and height
+        cropped_frame = frame[y:y+h, x:x+w].copy()
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 225), 2)
         # Process the image to get the position and binary mask
         pos, binary = symbol_position(cropped_frame)
 
@@ -80,10 +80,13 @@ def vedioTracking():
             x_pos, y_pos,w_pos,h_pos = pos[-1]  # Assuming `pos` contains the (x, y) position
             font = cv2.FONT_HERSHEY_SIMPLEX
             font_scale = 1
-            color = (255, 255, 255)  # White color
+            color = (0, 0, 0)  # White color
             thickness = 2
             # Draw the text on the image
             cv2.putText(frame, text, (x_pos+x+w_pos+20, y_pos+y+h_pos), font, font_scale, color, thickness)
+            for p in pos:
+                conx,cony,conW,conH = p
+                cv2.rectangle(frame,(conx+x,cony+y),(conx+x+conW,cony+y+conH),(255, 0, 0),1)
 
 
 
@@ -97,13 +100,13 @@ def vedioTracking():
 
 #%%
 vedioTracking()
-image = cv2.imread(r'C:\Mathlab\my code\ANN\annpro\ann_project\img.jpg')
-pos,binary=symbol_position(image)
-symbols = [resize(binary[y:y+h, x:x+w]) for x, y, w, h in pos]
+# image = cv2.imread(r'C:\Mathlab\my code\ANN\annpro\ann_project\img.jpg')
+# pos,binary=symbol_position(image)
+# symbols = [resize(binary[y:y+h, x:x+w]) for x, y, w, h in pos]
 
-count=1
-f = "C:\\Mathlab\\my code\\ANN\\annpro\\ann_project\\images\\"
-for sym in symbols:
-    # showimg(sym)
-    # cv2.imwrite(f'{f}\symbol{count}.png', sym)
-    count+=1
+# count=1
+# f = "C:\\Mathlab\\my code\\ANN\\annpro\\ann_project\\images\\"
+# for sym in symbols:
+#     showimg(sym)
+#     cv2.imwrite(f'{f}\symbol{count}.png', sym)
+#     count+=1
