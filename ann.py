@@ -55,8 +55,9 @@ def resize(img):
 def symbol_position(image):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # Apply thresholding to create a binary image
-    _, binary = cv2.threshold(image, 153, 255, cv2.THRESH_BINARY_INV)
+    _, binary = cv2.threshold(image, 135, 255, cv2.THRESH_BINARY_INV)
     cv2.imshow('blacky', binary)
+    # showimg(binary)
 
     # Find contours
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -86,22 +87,23 @@ def vedioTracking():
         pos, binary = symbol_position(cropped_frame)
 
         # Display text at the specified position
-        text = "=3"
         if pos:
             x_pos, y_pos,w_pos,h_pos = pos[-1]  # Assuming `pos` contains the (x, y) position
             font = cv2.FONT_HERSHEY_SIMPLEX
             font_scale = 1
             color = (0, 0, 0)  # White color
             thickness = 2
-            # Draw the text on the image
-            cv2.putText(frame, text, (x_pos+x+w_pos+20, y_pos+y+h_pos), font, font_scale, color, thickness)
+            symbols = [resize(binary[y:y+h, x:x+w]) for x, y, w, h in pos]
+            print("below symbols")
+            result=photo_add(symbols)
+            if result:
+                text = "= "+str(result)
+                # Draw the text on the image
+                cv2.putText(frame, text, (x_pos+x+w_pos+20, y_pos+y+h_pos), font, font_scale, color, thickness)
             for p in pos:
                 conx,cony,conW,conH = p
                 cv2.rectangle(frame,(conx+x,cony+y),(conx+x+conW,cony+y+conH),(255, 0, 0),1)
 
-
-
-        
         # Optionally, display the frame with the text (e.g., in a window)
         cv2.imshow('Frame with Text', frame)
         if cv2.waitKey(1) & 0xff == ord('q'): 
@@ -138,7 +140,7 @@ def load_images_from_folder(folder_path):
 
     return np.array(images), numeric_labels, label_encoder.classes_
 
-def train_model(dataset_path='symbols'):
+def train_model(dataset_path='C:\\Mathlab\\my code\\ANN\\annpro\\ann_project\\symbols'):
     print('Please wait, the network is training...!')
     images, labels, class_names = load_images_from_folder(dataset_path)
     images = images.reshape((images.shape[0], 784)).astype('float32') / 255  # Flatten and normalize
@@ -161,44 +163,80 @@ def train_model(dataset_path='symbols'):
     return model, class_names
 
 def predict_image(image_path, model, class_names):
-    img = Image.open(image_path).convert('L')  # Convert to grayscale
-    img = img.resize((28, 28))  # Resize to 28x28 pixels
+    img = (image_path)
+    # img = img.resize((28, 28))  # Resize to 28x28 pixels
 
     img_array = np.array(img).reshape(1, 784).astype('float32') / 255
     predictions = model.predict(img_array)
     prediction = np.argmax(predictions)
     confidence = predictions[0][prediction]  # Confidence score
 
-    plt.imshow(img, cmap='gray')
-    plt.title(f"Predicted Label: {class_names[prediction]} (Confidence: {confidence:.2f})")
-    plt.show()
+
 
     return class_names[prediction], confidence
 def load_trained_model():
     try:
         model = load_model('symbol_model.h5')
-        _, _, class_names = load_images_from_folder('symbols')  # Ensure you load class names
+        _, _, class_names = load_images_from_folder(r'C:\Mathlab\my code\ANN\annpro\ann_project\symbols')  # Ensure you load class names
         print("Loaded saved model.")
         return model, class_names
     except Exception as e:
         print(f"Failed to load model: {e}")
         return None, None
+def photo_add(list):
+    flag_num1=True
+    flag_num2=False
+    fistnum=0
+    lastnum=0
+    opt=None
+    result=None
+    for i in list:
+        label, confidence = predict_image(i, model, class_names)
+        if (confidence*100)>=30:
+                if label.isdigit() and flag_num1:
+                    fistnum= fistnum * 10 + int(label)
+                elif label.isalpha() and flag_num1:
+                    flag_num1=False
+                    opt=label
+                elif label.isdigit():
+                    flag_num2=True
+                    lastnum=lastnum * 10 + int(label)
+        else:
+            print("Prediction failed. Confidence is too low.")
+            print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
+    if  flag_num2 :   
+        if opt=='plus':
+            result=fistnum+lastnum
+        elif opt=='minus':
+            result=fistnum-lastnum
+        elif opt == "slash":
+            if lastnum != 0:
+                result=fistnum/lastnum
+            else:
+                result="Division by 0"
+        else:
+            result=fistnum*lastnum
+        print('Prediction completed!')
+        print(result)
+        print(type(result),fistnum,opt,lastnum)
+    return result
 
 
 # Main Execution Flow
 if __name__ == "__main__":
 
 #=======================my code start ====================================
-    vedioTracking()
-    # image = cv2.imread(r'C:\Mathlab\my code\ANN\annpro\ann_project\img.jpg')
+    # vedioTracking()
+    # model, class_names = load_trained_model()
+    # image = cv2.imread(r'C:\Mathlab\my code\ANN\annpro\ann_project\imggg.jpg')
     # pos,binary=symbol_position(image)
     # symbols = [resize(binary[y:y+h, x:x+w]) for x, y, w, h in pos]
-
+    # print("i am hear")
+    # text=photo_add(symbols)
+    # print(text)
     # count=1
-    # f = "C:\\Mathlab\\my code\\ANN\\annpro\\ann_project\\images\\"
     # for sym in symbols:
     #     showimg(sym)
-    #     cv2.imwrite(f'{f}\symbol{count}.png', sym)
     #     count+=1
 #================== my code end =============================================
     # Step 1: Train the model (only once)
@@ -210,18 +248,5 @@ if __name__ == "__main__":
         model, class_names = train_model()
 
     # Step 2: Predict using the saved model
-        print('Your code is predicting. Please be cool...!')
-    
-    label, confidence = predict_image("symbol7.png", model, class_names)
-    if (confidence*100)<=30:
-            print("Prediction failed. Confidence is too low.")
-    elif label:
-        # if (confidence*100)<=30:
-        #     print("Prediction failed. Confidence is too low.")
-        print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
-    print('Prediction completed!')
-    # print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
-    # print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
-
-# print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
-print(f"Predicted Label: {label}, Confidence: {confidence:.2f}")
+    print('Your code is predicting. Please be cool...!')
+    vedioTracking()
