@@ -94,7 +94,10 @@ def vedioTracking():
             font_scale = 1
             color = (0, 0, 0)  # White color
             thickness = 2
-            symbols = [resize(binary[y:y+h, x:x+w]) for x, y, w, h in pos]
+            try:
+                symbols = [resize(binary[y:y+h, x:x+w]) for x, y, w, h in pos]
+            except:
+                pass
             print("below symbols")
             result=photo_add(symbols)
             if result:
@@ -144,22 +147,29 @@ def load_images_from_folder(folder_path):
 def train_model(dataset_path='C:\\Mathlab\\my code\\ANN\\annpro\\ann_project\\symbols'):
     print('Please wait, the network is training...!')
     images, labels, class_names = load_images_from_folder(dataset_path)
+    print("first lable = ",labels)
     images = images.reshape((images.shape[0], 784)).astype('float32') / 255  # Flatten and normalize
     labels = to_categorical(labels)
 
     x_train, x_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
 
     model = Sequential([
-        layers.Dense(80, activation='relu', input_shape=(784,)),  # Input layer with hidden layer 1
+        layers.Dense(150, activation='relu', input_shape=(784,)),  # Input layer with hidden layer 1
         layers.Dense(len(class_names), activation='softmax')  # Output layer
     ])
 
     model.compile(optimizer='sgd', loss='categorical_crossentropy', metrics=['accuracy'])
-    model.fit(x_train, y_train, epochs=8, validation_data=(x_test, y_test))
+    model.fit(x_train, y_train, epochs=60, validation_data=(x_test, y_test))
 
     model.save('symbol_model.h5')  # Save the trained model
     with open('class_names.pkl', 'wb') as f:
         pickle.dump(class_names, f)
+    f.close()
+    with open('class_names.pkl', 'rb') as file:
+            loaded_classes = pickle.load(file)
+    file.close()
+    print("loaged class ========== " )
+    print(loaded_classes)
 
     print("Model trained and saved as 'symbol_model.h5'")
     print(f"Class names: {class_names}")  # Save this for later use in prediction
@@ -178,16 +188,16 @@ def predict_image(image_path, model, class_names):
 
     return class_names[prediction], confidence
 def load_trained_model():
-    try:
+    # try:
         model = load_model('symbol_model.h5')
-        with open('class_names.pkl', 'wb') as f:
-            pickle.dump(class_names, f)
+        with open('class_names.pkl', 'rb') as file:
+            loaded_classes = pickle.load(file)
 
         print("Loaded saved model.")
-        return model, class_names
-    except Exception as e:
-        print(f"Failed to load model: {e}")
-        return None, None
+        return model, loaded_classes
+    # except Exception as e:
+        # print(f"Failed to load model: {e}")
+        # return None, None
 def photo_add(list):
     flag_num1=True
     flag_num2=False
@@ -248,6 +258,7 @@ if __name__ == "__main__":
     # Check if the model is already trained and saved
     if os.path.exists('symbol_model.h5'):
         model, class_names = load_trained_model()
+        print(class_names)
     else:
         # Step 1: Train the model (only if not already trained)
         model, class_names = train_model()
