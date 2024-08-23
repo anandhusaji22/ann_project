@@ -9,6 +9,7 @@ from keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
 from PIL import Image
 from sklearn.preprocessing import LabelEncoder
+import pickle
 
 cap = cv2.VideoCapture(0) 
 model = None
@@ -157,6 +158,8 @@ def train_model(dataset_path='C:\\Mathlab\\my code\\ANN\\annpro\\ann_project\\sy
     model.fit(x_train, y_train, epochs=8, validation_data=(x_test, y_test))
 
     model.save('symbol_model.h5')  # Save the trained model
+    with open('class_names.pkl', 'wb') as f:
+        pickle.dump(class_names, f)
 
     print("Model trained and saved as 'symbol_model.h5'")
     print(f"Class names: {class_names}")  # Save this for later use in prediction
@@ -177,7 +180,9 @@ def predict_image(image_path, model, class_names):
 def load_trained_model():
     try:
         model = load_model('symbol_model.h5')
-        _, _, class_names = load_images_from_folder(r'C:\Mathlab\my code\ANN\annpro\ann_project\symbols')  # Ensure you load class names
+        with open('class_names.pkl', 'wb') as f:
+            pickle.dump(class_names, f)
+
         print("Loaded saved model.")
         return model, class_names
     except Exception as e:
