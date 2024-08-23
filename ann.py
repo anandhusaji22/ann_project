@@ -144,7 +144,7 @@ def load_images_from_folder(folder_path):
 
     return np.array(images), numeric_labels, label_encoder.classes_
 
-def train_model(dataset_path='C:\\Mathlab\\my code\\ANN\\annpro\\ann_project\\symbols'):
+def train_model(dataset_path='symbols'):
     print('Please wait, the network is training...!')
     images, labels, class_names = load_images_from_folder(dataset_path)
     print("first lable = ",labels)
